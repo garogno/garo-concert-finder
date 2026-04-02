@@ -47,33 +47,67 @@
   <p id="msg">Connecting your Spotify account...</p>
 
   <script>
-    function getHashParams() {
-      const hash = window.location.hash.substring(1);
-      return Object.fromEntries(new URLSearchParams(hash));
+    const CLIENT_ID = '0a96fee12f204fd2a1de30e21193b127';
+    const REDIRECT_URI = 'https://garogno.github.io/garo-concert-finder/callback.html';
+
+    async function exchangeToken(code, verifier) {
+      const response = await fetch('https://accounts.spotify.com/api/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: REDIRECT_URI,
+          client_id: CLIENT_ID,
+          code_verifier: verifier,
+        })
+      });
+      if (!response.ok) throw new Error('Token exchange failed');
+      return response.json();
     }
 
-    function getQueryParams() {
-      return Object.fromEntries(new URLSearchParams(window.location.search));
+    async function init() {
+      const query = Object.fromEntries(new URLSearchParams(window.location.search));
+
+      if (query.error) {
+        document.getElementById('spinner').style.display = 'none';
+        document.getElementById('msg').className = 'error';
+        document.getElementById('msg').textContent = `Spotify login failed: ${query.error}. Please go back and try again.`;
+        return;
+      }
+
+      if (!query.code) {
+        document.getElementById('spinner').style.display = 'none';
+        document.getElementById('msg').className = 'error';
+        document.getElementById('msg').textContent = 'No code received. Please go back and try connecting again.';
+        return;
+      }
+
+      const verifier = sessionStorage.getItem('spotify_verifier');
+      if (!verifier) {
+        document.getElementById('spinner').style.display = 'none';
+        document.getElementById('msg').className = 'error';
+        document.getElementById('msg').textContent = 'Session expired. Please go back and try again.';
+        return;
+      }
+
+      try {
+        document.getElementById('msg').textContent = 'Exchanging token with Spotify...';
+        const data = await exchangeToken(query.code, verifier);
+        sessionStorage.setItem('spotify_token', data.access_token);
+        if (data.refresh_token) sessionStorage.setItem('spotify_refresh_token', data.refresh_token);
+        document.getElementById('msg').textContent = 'Connected! Taking you back...';
+        setTimeout(() => {
+          window.location.href = '/garo-concert-finder/index.html';
+        }, 800);
+      } catch (err) {
+        document.getElementById('spinner').style.display = 'none';
+        document.getElementById('msg').className = 'error';
+        document.getElementById('msg').textContent = `Token exchange failed: ${err.message}. Please go back and try again.`;
+      }
     }
 
-    const params = getHashParams();
-    const query = getQueryParams();
-
-    if (query.error) {
-      document.getElementById('spinner').style.display = 'none';
-      document.getElementById('msg').className = 'error';
-      document.getElementById('msg').textContent = `Spotify login failed: ${query.error}. Please go back and try again.`;
-    } else if (params.access_token) {
-      sessionStorage.setItem('spotify_token', params.access_token);
-      document.getElementById('msg').textContent = 'Connected! Taking you back...';
-      setTimeout(() => {
-        window.location.href = '/garo-concert-finder/index.html';
-      }, 800);
-    } else {
-      document.getElementById('spinner').style.display = 'none';
-      document.getElementById('msg').className = 'error';
-      document.getElementById('msg').textContent = 'No token received. Please go back and try connecting again.';
-    }
+    init();
   </script>
 </body>
 </html>
