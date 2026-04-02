@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connecting...</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0a0a;
+      color: #f0ede6;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 2px solid #222;
+      border-top-color: #c8f135;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    p { color: #666; font-size: 0.85rem; letter-spacing: 0.05em; }
+    .logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.4rem;
+      letter-spacing: 0.15em;
+      color: #c8f135;
+      position: fixed;
+      top: 2rem;
+      left: 3rem;
+    }
+    .error { color: #f13567; text-align: center; max-width: 320px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div class="logo">Garo<span style="color:#f0ede6">.</span>Concert</div>
+  <div class="spinner" id="spinner"></div>
+  <p id="msg">Connecting your Spotify account...</p>
+
+  <script>
+    function getHashParams() {
+      const hash = window.location.hash.substring(1);
+      return Object.fromEntries(new URLSearchParams(hash));
+    }
+
+    function getQueryParams() {
+      return Object.fromEntries(new URLSearchParams(window.location.search));
+    }
+
+    const params = getHashParams();
+    const query = getQueryParams();
+
+    if (query.error) {
+      document.getElementById('spinner').style.display = 'none';
+      document.getElementById('msg').className = 'error';
+      document.getElementById('msg').textContent = `Spotify login failed: ${query.error}. Please go back and try again.`;
+    } else if (params.access_token) {
+      sessionStorage.setItem('spotify_token', params.access_token);
+      document.getElementById('msg').textContent = 'Connected! Taking you back...';
+      setTimeout(() => {
+        window.location.href = '/garo-concert-finder/index.html';
+      }, 800);
+    } else {
+      document.getElementById('spinner').style.display = 'none';
+      document.getElementById('msg').className = 'error';
+      document.getElementById('msg').textContent = 'No token received. Please go back and try connecting again.';
+    }
+  </script>
+</body>
+</html>

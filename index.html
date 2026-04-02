@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Garo Concert Finder</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0a;
+      --surface: #111111;
+      --surface2: #1a1a1a;
+      --accent: #c8f135;
+      --accent2: #f13567;
+      --text: #f0ede6;
+      --muted: #666;
+      --border: #222;
+      --radius: 4px;
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Grain overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0.4;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 2rem 3rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.8rem;
+      letter-spacing: 0.15em;
+      color: var(--accent);
+    }
+
+    .logo span {
+      color: var(--text);
+    }
+
+    .hero {
+      padding: 5rem 3rem 3rem;
+      max-width: 900px;
+    }
+
+    .hero h1 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(3.5rem, 10vw, 7rem);
+      line-height: 0.92;
+      letter-spacing: 0.02em;
+      color: var(--text);
+      margin-bottom: 1.5rem;
+    }
+
+    .hero h1 em {
+      color: var(--accent);
+      font-style: normal;
+    }
+
+    .hero p {
+      font-size: 1.05rem;
+      color: var(--muted);
+      max-width: 480px;
+      line-height: 1.7;
+      margin-bottom: 2.5rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      background: var(--accent);
+      color: #0a0a0a;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 500;
+      font-size: 0.9rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.9rem 2rem;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+
+    .btn:hover {
+      background: #d4ff3a;
+      transform: translateY(-1px);
+    }
+
+    .btn svg { width: 18px; height: 18px; }
+
+    /* Main content */
+    main {
+      padding: 0 3rem 4rem;
+    }
+
+    /* Loading state */
+    #loading {
+      display: none;
+      padding: 4rem 0;
+      text-align: center;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 1.5rem;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #loading p {
+      color: var(--muted);
+      font-size: 0.9rem;
+      letter-spacing: 0.05em;
+    }
+
+    /* Results */
+    #results { display: none; }
+
+    .section-header {
+      display: flex;
+      align-items: baseline;
+      gap: 1rem;
+      margin: 3rem 0 1.5rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-header h2 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.4rem;
+      letter-spacing: 0.1em;
+      color: var(--text);
+    }
+
+    .section-header span {
+      font-size: 0.8rem;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    /* Top artists row */
+    .artists-scroll {
+      display: flex;
+      gap: 1rem;
+      overflow-x: auto;
+      padding-bottom: 1rem;
+      scrollbar-width: none;
+    }
+
+    .artists-scroll::-webkit-scrollbar { display: none; }
+
+    .artist-chip {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.9rem 0.5rem 0.5rem;
+      white-space: nowrap;
+      font-size: 0.85rem;
+      color: var(--text);
+    }
+
+    .artist-chip img {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: var(--surface2);
+    }
+
+    /* Concert cards */
+    .concerts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+    }
+
+    .concert-card {
+      background: var(--surface);
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      transition: background 0.15s;
+      cursor: default;
+    }
+
+    .concert-card:hover { background: var(--surface2); }
+
+    .concert-card .match-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .concert-card .match-badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+    }
+
+    .concert-card h3 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.5rem;
+      letter-spacing: 0.05em;
+      line-height: 1;
+      color: var(--text);
+    }
+
+    .concert-card .similar-to {
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .concert-card .meta {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      margin-top: auto;
+    }
+
+    .concert-card .meta-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .concert-card .meta-row svg {
+      width: 12px;
+      height: 12px;
+      opacity: 0.5;
+      flex-shrink: 0;
+    }
+
+    .concert-card .date-tag {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1rem;
+      letter-spacing: 0.08em;
+      color: var(--accent2);
+    }
+
+    /* Error state */
+    #error {
+      display: none;
+      padding: 3rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      margin-top: 2rem;
+    }
+
+    #error h3 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.4rem;
+      color: var(--accent2);
+      margin-bottom: 0.5rem;
+    }
+
+    #error p { color: var(--muted); font-size: 0.9rem; }
+
+    /* Footer */
+    footer {
+      padding: 2rem 3rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    footer p { font-size: 0.75rem; color: var(--muted); letter-spacing: 0.03em; }
+
+    .logout-btn {
+      font-size: 0.75rem;
+      color: var(--muted);
+      background: none;
+      border: 1px solid var(--border);
+      padding: 0.4rem 0.8rem;
+      cursor: pointer;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      transition: all 0.15s;
+    }
+
+    .logout-btn:hover { color: var(--text); border-color: var(--muted); }
+
+    @media (max-width: 600px) {
+      header, .hero, main, footer { padding-left: 1.5rem; padding-right: 1.5rem; }
+      .hero { padding-top: 3rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Garo<span>.</span>Concert</div>
+  <button class="logout-btn" id="logoutBtn" style="display:none" onclick="logout()">Log out</button>
+</header>
+
+<div class="hero" id="heroSection">
+  <h1>Find concerts<br>you'll <em>actually</em><br>love.</h1>
+  <p>Connect your Spotify, and we'll match upcoming shows near Amsterdam to your taste — powered by AI.</p>
+  <a href="#" class="btn" id="loginBtn" onclick="loginWithSpotify(event)">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+    Connect Spotify
+  </a>
+</div>
+
+<main>
+  <div id="loading">
+    <div class="spinner"></div>
+    <p id="loadingMsg">Connecting to Spotify...</p>
+  </div>
+
+  <div id="error">
+    <h3>Something went wrong</h3>
+    <p id="errorMsg">Please try again.</p>
+  </div>
+
+  <div id="results">
+    <div class="section-header">
+      <h2>Your Top Artists</h2>
+      <span>from Spotify</span>
+    </div>
+    <div class="artists-scroll" id="artistsList"></div>
+
+    <div class="section-header">
+      <h2>Concerts Near Amsterdam</h2>
+      <span>matched to your taste</span>
+    </div>
+    <div class="concerts-grid" id="concertsList"></div>
+  </div>
+</main>
+
+<footer>
+  <p>Powered by Spotify + Claude &mdash; Amsterdam area concerts</p>
+</footer>
+
+<script>
+  const CLIENT_ID = '0a96fee12f204fd2a1de30e21193b127';
+  const REDIRECT_URI = 'https://garogno.github.io/garo-concert-finder/callback.html';
+  const SCOPES = 'user-top-read';
+
+  function loginWithSpotify(e) {
+    e.preventDefault();
+    const state = Math.random().toString(36).substring(2);
+    sessionStorage.setItem('spotify_state', state);
+    const params = new URLSearchParams({
+      response_type: 'token',
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      redirect_uri: REDIRECT_URI,
+      state,
+      show_dialog: false
+    });
+    window.location.href = `https://accounts.spotify.com/authorize?${params}`;
+  }
+
+  function logout() {
+    sessionStorage.clear();
+    document.getElementById('logoutBtn').style.display = 'none';
+    document.getElementById('heroSection').style.display = 'block';
+    document.getElementById('results').style.display = 'none';
+  }
+
+  function showLoading(msg) {
+    document.getElementById('heroSection').style.display = 'none';
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('loadingMsg').textContent = msg;
+    document.getElementById('error').style.display = 'none';
+    document.getElementById('results').style.display = 'none';
+  }
+
+  function showError(msg) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('error').style.display = 'block';
+    document.getElementById('errorMsg').textContent = msg;
+  }
+
+  async function fetchTopArtists(token) {
+    const res = await fetch('https://api.spotify.com/v1/me/top/artists?limit=10&time_range=medium_term', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error('Failed to fetch Spotify data');
+    const data = await res.json();
+    return data.items;
+  }
+
+  function renderArtists(artists) {
+    const el = document.getElementById('artistsList');
+    el.innerHTML = artists.map(a => `
+      <div class="artist-chip">
+        <img src="${a.images?.[2]?.url || ''}" alt="${a.name}" onerror="this.style.display='none'" />
+        ${a.name}
+      </div>
+    `).join('');
+  }
+
+  async function findConcerts(artists) {
+    const artistNames = artists.map(a => a.name).join(', ');
+    const genres = [...new Set(artists.flatMap(a => a.genres))].slice(0, 8).join(', ');
+
+    const prompt = `You are a concert recommendation assistant. The user listens to these artists on Spotify: ${artistNames}. Their music genres include: ${genres}.
+
+Based on this taste profile, find upcoming concerts and shows near Amsterdam, Netherlands (within ~100km) happening in April, May, June, or July 2026. Focus on artists that are similar in style or genre to the ones listed.
+
+Return ONLY a JSON array (no markdown, no explanation) with up to 8 concert objects. Each object must have:
+- "artist": artist/band name
+- "similarTo": which of the user's artists this is similar to (1-2 names)
+- "venue": venue name
+- "city": city name
+- "date": date string like "15 May 2026"
+- "genre": short genre label
+- "matchReason": one short sentence why this matches their taste
+
+Only include real, plausible concerts. If you're not certain about a specific date, use approximate months. Focus on quality matches over quantity.`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    const data = await response.json();
+    const text = data.content?.find(b => b.type === 'text')?.text || '[]';
+    const clean = text.replace(/```json|```/g, '').trim();
+    return JSON.parse(clean);
+  }
+
+  function renderConcerts(concerts) {
+    const el = document.getElementById('concertsList');
+    if (!concerts.length) {
+      el.innerHTML = '<div style="padding:2rem;color:var(--muted);font-size:0.9rem;">No strong matches found. Try again or update your Spotify listening history.</div>';
+      return;
+    }
+    el.innerHTML = concerts.map(c => `
+      <div class="concert-card">
+        <div class="match-badge">Taste Match</div>
+        <h3>${c.artist}</h3>
+        <div class="similar-to">Similar to ${c.similarTo}</div>
+        <div class="meta">
+          <div class="meta-row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            ${c.venue}, ${c.city}
+          </div>
+          <div class="meta-row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span class="date-tag">${c.date}</span>
+          </div>
+          <div class="meta-row" style="margin-top:0.5rem;font-style:italic;font-size:0.78rem;">
+            ${c.matchReason}
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function init() {
+    const token = sessionStorage.getItem('spotify_token');
+    if (!token) return;
+
+    document.getElementById('logoutBtn').style.display = 'block';
+    showLoading('Fetching your top artists from Spotify...');
+
+    try {
+      const artists = await fetchTopArtists(token);
+      renderArtists(artists);
+
+      document.getElementById('loadingMsg').textContent = 'Finding concerts that match your taste...';
+      const concerts = await findConcerts(artists);
+      renderConcerts(concerts);
+
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('results').style.display = 'block';
+    } catch (err) {
+      showError(err.message || 'Something went wrong. Your Spotify session may have expired.');
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>
